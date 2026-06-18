@@ -176,6 +176,11 @@ jobs:
       - name: Package SDK
         run: |
           if ($env:RUNNER_OS -eq 'Windows') {
+            # Ensure bin dir exists, then copy vcpkg DLLs
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/bin" | Out-Null
+            Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/bin/*" -Destination "${{ github.workspace }}/installdir/bin/" -Recurse -Force
+            # Copy vcpkg .lib import libraries for linking
+            Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/lib/*" -Destination "${{ github.workspace }}/installdir/lib/" -Recurse -Force
             tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           } elseif ($env:RUNNER_OS -eq 'Linux') {
             tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .

@@ -131,7 +131,7 @@ jobs:
           brew install ninja apache2 $packages
           $PKG_CONFIG_PATH = `
             $packages | `
-            % { "(& brew --prefix $_)/lib/pkgconfig" } | `
+            % { "$(& brew --prefix $_)/lib/pkgconfig" } | `
             Join-String -Separator ':'
           "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"  >> $env:GITHUB_ENV
 

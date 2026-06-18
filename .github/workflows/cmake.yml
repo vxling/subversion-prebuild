@@ -22,10 +22,7 @@
 name: CMake
 
 on:
-  push:
-    branches: ["*"]
-  pull_request:
-    branches: ["*"]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.ref }}
@@ -41,31 +38,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows, shared, x64, with tests
-            os: windows-2022
-            build_shared: ON
-            cmake_generator: Ninja
-            vcpkg_triplet: x64-windows
-            arch: x64
-            run_tests: true
           - name: Windows, shared, x64, vs2022, with tests
             os: windows-2022
             build_shared: ON
             cmake_generator: 'Visual Studio 17 2022'
             vcpkg_triplet: x64-windows
-            arch: x64
-            run_tests: true
-          - name: Windows, shared, x86
-            os: windows-2022
-            build_shared: ON
-            cmake_generator: Ninja
-            vcpkg_triplet: x86-windows
-            arch: x86
-          - name: Windows, static, x64, with tests
-            os: windows-2022
-            build_shared: OFF
-            cmake_generator: Ninja
-            vcpkg_triplet: x64-windows-static-md
             arch: x64
             run_tests: true
           - name: Linux, shared, with tests

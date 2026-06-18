@@ -41,12 +41,59 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows, shared, x64
+          - name: Windows, shared, x64, with tests
+            os: windows-2022
+            build_shared: ON
+            cmake_generator: Ninja
+            vcpkg_triplet: x64-windows
+            arch: x64
+            run_tests: true
+          - name: Windows, shared, x64, vs2022, with tests
             os: windows-2022
             build_shared: ON
             cmake_generator: 'Visual Studio 17 2022'
             vcpkg_triplet: x64-windows
             arch: x64
+            run_tests: true
+          - name: Windows, shared, x86
+            os: windows-2022
+            build_shared: ON
+            cmake_generator: Ninja
+            vcpkg_triplet: x86-windows
+            arch: x86
+          - name: Windows, static, x64, with tests
+            os: windows-2022
+            build_shared: OFF
+            cmake_generator: Ninja
+            vcpkg_triplet: x64-windows-static-md
+            arch: x64
+            run_tests: true
+          - name: Linux, shared, with tests
+            os: ubuntu-latest
+            cmake_generator: Ninja
+            build_shared: ON
+            run_tests: true
+            extra_config_opts: >
+              -DSVN_ENABLE_AUTH_KWALLET=ON
+              -DSVN_ENABLE_AUTH_GNOME_KEYRING=ON
+              -DSVN_ENABLE_SASL=ON
+              -DSVN_ENABLE_LIBMAGIC=ON
+            extra_packages: >
+              libkf5wallet-dev
+              libkf5coreaddons-dev
+              libkf5i18n-dev
+              libdbus-1-dev
+              qtbase5-dev
+              libsecret-1-dev
+              python3-lxml
+              python3-rnc2rng
+              libsasl2-dev
+              libmagic-dev
+          - name: Mac OS
+            os: macos-latest
+            build_shared: ON
+            cmake_generator: Ninja
+            run_tests: true
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
@@ -152,14 +199,21 @@ jobs:
           };
           cmake -B out
           -DBUILD_SHARED_LIBS=${{ matrix.build_shared }}
-          -DSVN_ENABLE_TESTS=OFF
+          -DSVN_ENABLE_TESTS=ON
           -DSVN_ENABLE_RA_SERF=ON
-          -DSVN_ENABLE_NLS=OFF
-          -DSVN_ENABLE_APACHE_MODULES=OFF
-          -DSVN_ENABLE_PROGRAMS=OFF
-          -DSVN_ENABLE_TUI=OFF
+          -DSVN_ENABLE_NLS=ON
+          -DSVN_ENABLE_APACHE_MODULES=${{ runner.os != 'Windows' && 'ON' || 'OFF' }}
+          -DSVN_ENABLE_TUI=ON
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/installdir
           -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+          -DSVN_TEST_CONFIGURE_FOR_PARALLEL=ON
+          -DSVN_ENABLE_FS_BASE=OFF
+          -DSVN_ENABLE_SWIG_PERL=OFF
+          -DSVN_ENABLE_SWIG_PYTHON=OFF
+          -DSVN_ENABLE_SWIG_RUBY=OFF
+          -DSVN_ENABLE_PROGRAMS=OFF
+          -DSVN_ENABLE_TOOLS=OFF
+          ${{ matrix.extra_config_opts }}
 
       - name: Build CMake
         run: cmake --build out --config Release
@@ -167,8 +221,22 @@ jobs:
       - name: Install
         run: cmake --install out --config Release
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: svn-dev-windows-x64
-          path: ${{ github.workspace }}/installdir
+      - name: Run all tests
+        id: run_all_tests
+        if: matrix.run_tests
+        working-directory: out
+        run: ctest --output-on-failure --verbose -C Release --parallel 16
+
+      - name: Test shelf2
+        if: matrix.run_tests
+        working-directory: out
+        env:
+          SVN_EXPERIMENTAL_COMMANDS: shelf2
+        run: ctest -R shelf2 --verbose -C Release
+
+      - name: Test shelf3
+        if: matrix.run_tests
+        working-directory: out
+        env:
+          SVN_EXPERIMENTAL_COMMANDS: shelf3
+        run: ctest -R shelf3 --verbose -C Release

@@ -181,7 +181,8 @@ jobs:
             Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/bin/*" -Destination "${{ github.workspace }}/installdir/bin/" -Recurse -Force
             # Copy vcpkg .lib import libraries for linking
             Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/lib/*" -Destination "${{ github.workspace }}/installdir/lib/" -Recurse -Force
-            tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
+            # Use Compress-Archive to create a real .zip file
+            Compress-Archive -Path "${{ github.workspace }}/installdir/*" -DestinationPath "${{ github.workspace }}/${{ matrix.artifact_name }}" -Force
           } elseif ($env:RUNNER_OS -eq 'Linux') {
             tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           } else {

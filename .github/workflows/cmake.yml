@@ -38,23 +38,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows, shared, x64, vs2022, with tests
+          - name: Windows, shared, x64, vs2022
             os: windows-2022
             build_shared: ON
             cmake_generator: 'Visual Studio 17 2022'
             vcpkg_triplet: x64-windows
             arch: x64
-            run_tests: false
+            artifact_name: svn-sdk-windows-x64.zip
           - name: Linux, shared, x64
             os: ubuntu-latest
             cmake_generator: Ninja
             build_shared: ON
-            run_tests: false
+            artifact_name: svn-sdk-linux-x64.tar.gz
           - name: Mac OS, shared, x64
             os: macos-latest
             build_shared: ON
             cmake_generator: Ninja
-            run_tests: false
+            artifact_name: svn-sdk-macos-x64.tar.gz
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
@@ -116,15 +116,11 @@ jobs:
         if: runner.os == 'Linux'
         run: >
           sudo apt-get update &&
-          sudo apt-get install
-          libtool
-          libtool-bin
-          libapr1-dev
-          libaprutil1-dev
-          libserf-dev
-          libexpat1-dev
-          zlib1g-dev
-          libsqlite3-dev
+          sudo apt-get install -y --no-install-recommends
+          libtool libtool-bin
+          libapr1-dev libaprutil1-dev
+          libserf-dev libexpat1-dev
+          zlib1g-dev libsqlite3-dev
           ninja-build
 
       - name: Install dependencies (Mac OS, homebrew)
@@ -135,7 +131,7 @@ jobs:
           brew install ninja apache2 $packages
           $PKG_CONFIG_PATH = `
             $packages | `
-            % { "$(& brew --prefix $_)/lib/pkgconfig" } | `
+            % { "(& brew --prefix $_)/lib/pkgconfig" } | `
             Join-String -Separator ':'
           "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"  >> $env:GITHUB_ENV
 
@@ -170,7 +166,6 @@ jobs:
           -DSVN_ENABLE_SWIG_RUBY=OFF
           -DSVN_ENABLE_PROGRAMS=OFF
           -DSVN_ENABLE_TOOLS=OFF
-          ${{ matrix.extra_config_opts }}
 
       - name: Build CMake
         run: cmake --build out --config Release
@@ -181,33 +176,34 @@ jobs:
       - name: Package SDK
         run: |
           if ($env:RUNNER_OS -eq 'Windows') {
-            tar -czf svn-sdk-windows-x64.zip -C ${{ github.workspace }}/installdir .
+            tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           } elseif ($env:RUNNER_OS -eq 'Linux') {
-            tar -czf svn-sdk-linux-x64.tar.gz -C ${{ github.workspace }}/installdir .
+            tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           } else {
-            tar -czf svn-sdk-macos-x64.tar.gz -C ${{ github.workspace }}/installdir .
+            tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           }
 
-      - name: Upload artifact (Windows)
-        if: runner.os == 'Windows'
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: svn-sdk-windows-x64
-          path: svn-sdk-windows-x64.zip
-          retention-days: 30
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+          retention-days: 1
 
-      - name: Upload artifact (Linux)
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: svn-sdk-linux-x64
-          path: svn-sdk-linux-x64.tar.gz
-          retention-days: 30
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
-      - name: Upload artifact (macOS)
-        if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: svn-sdk-macos-x64
-          path: svn-sdk-macos-x64.tar.gz
-          retention-days: 30
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: artifacts/*/*

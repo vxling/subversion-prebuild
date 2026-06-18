@@ -49,11 +49,13 @@ jobs:
             os: ubuntu-latest
             cmake_generator: Ninja
             build_shared: ON
+            vcpkg_triplet: ''
             artifact_name: svn-sdk-linux-x64.tar.gz
           - name: Mac OS, shared, x64
             os: macos-latest
             build_shared: ON
             cmake_generator: Ninja
+            vcpkg_triplet: ''
             artifact_name: svn-sdk-macos-x64.tar.gz
 
     runs-on: ${{ matrix.os }}

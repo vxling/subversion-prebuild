@@ -131,7 +131,7 @@ jobs:
           brew install ninja apache2 $packages
           $PKG_CONFIG_PATH = `
             $packages | `
-            % { "(& brew --prefix $_)/lib/pkgconfig" } | `
+            % { "$(& brew --prefix $_)/lib/pkgconfig" } | `
             Join-String -Separator ':'
           "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"  >> $env:GITHUB_ENV
 
@@ -158,7 +158,6 @@ jobs:
           -DSVN_ENABLE_APACHE_MODULES=OFF
           -DSVN_ENABLE_TUI=OFF
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/installdir
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
           -DSVN_INSTALL_PRIVATE_H=ON
           -DSVN_ENABLE_FS_BASE=OFF
           -DSVN_ENABLE_SWIG_PERL=OFF
@@ -166,6 +165,7 @@ jobs:
           -DSVN_ENABLE_SWIG_RUBY=OFF
           -DSVN_ENABLE_PROGRAMS=OFF
           -DSVN_ENABLE_TOOLS=OFF
+          ${{ runner.os == 'Windows' && '-DVCPKG_TARGET_TRIPLET=' + matrix.vcpkg_triplet || '' }}
 
       - name: Build CMake
         run: cmake --build out --config Release

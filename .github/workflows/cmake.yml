@@ -177,3 +177,37 @@ jobs:
 
       - name: Install
         run: cmake --install out --config Release
+
+      - name: Package SDK
+        run: |
+          if ($env:RUNNER_OS -eq 'Windows') {
+            tar -czf svn-sdk-windows-x64.zip -C ${{ github.workspace }}/installdir .
+          } elseif ($env:RUNNER_OS -eq 'Linux') {
+            tar -czf svn-sdk-linux-x64.tar.gz -C ${{ github.workspace }}/installdir .
+          } else {
+            tar -czf svn-sdk-macos-x64.tar.gz -C ${{ github.workspace }}/installdir .
+          }
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: svn-sdk-windows-x64
+          path: svn-sdk-windows-x64.zip
+          retention-days: 30
+
+      - name: Upload artifact (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: svn-sdk-linux-x64
+          path: svn-sdk-linux-x64.tar.gz
+          retention-days: 30
+
+      - name: Upload artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: svn-sdk-macos-x64
+          path: svn-sdk-macos-x64.tar.gz
+          retention-days: 30

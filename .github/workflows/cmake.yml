@@ -176,11 +176,14 @@ jobs:
       - name: Package SDK
         run: |
           if ($env:RUNNER_OS -eq 'Windows') {
-            # Ensure bin dir exists, then copy vcpkg DLLs
+            # Ensure directories exist
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/bin" | Out-Null
-            Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/bin/*" -Destination "${{ github.workspace }}/installdir/bin/" -Recurse -Force
-            # Copy vcpkg .lib import libraries for linking
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/lib" | Out-Null
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/include" | Out-Null
+            # Copy vcpkg DLLs, .lib import libraries, and public headers
+            Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/bin/*" -Destination "${{ github.workspace }}/installdir/bin/" -Recurse -Force -Exclude "*.pdb"
             Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/lib/*" -Destination "${{ github.workspace }}/installdir/lib/" -Recurse -Force
+            Copy-Item "C:/vcpkg/installed/${{ matrix.vcpkg_triplet }}/include/*" -Destination "${{ github.workspace }}/installdir/include/" -Recurse -Force
             # Use Compress-Archive to create a real .zip file
             Compress-Archive -Path "${{ github.workspace }}/installdir/*" -DestinationPath "${{ github.workspace }}/${{ matrix.artifact_name }}" -Force
           } elseif ($env:RUNNER_OS -eq 'Linux') {

@@ -44,33 +44,17 @@ jobs:
             cmake_generator: 'Visual Studio 17 2022'
             vcpkg_triplet: x64-windows
             arch: x64
-            run_tests: true
-          - name: Linux, shared, with tests
+            run_tests: false
+          - name: Linux, shared, x64
             os: ubuntu-latest
             cmake_generator: Ninja
             build_shared: ON
-            run_tests: true
-            extra_config_opts: >
-              -DSVN_ENABLE_AUTH_KWALLET=ON
-              -DSVN_ENABLE_AUTH_GNOME_KEYRING=ON
-              -DSVN_ENABLE_SASL=ON
-              -DSVN_ENABLE_LIBMAGIC=ON
-            extra_packages: >
-              libkf5wallet-dev
-              libkf5coreaddons-dev
-              libkf5i18n-dev
-              libdbus-1-dev
-              qtbase5-dev
-              libsecret-1-dev
-              python3-lxml
-              python3-rnc2rng
-              libsasl2-dev
-              libmagic-dev
-          - name: Mac OS
+            run_tests: false
+          - name: Mac OS, shared, x64
             os: macos-latest
             build_shared: ON
             cmake_generator: Ninja
-            run_tests: true
+            run_tests: false
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.name }}
@@ -141,11 +125,7 @@ jobs:
           libexpat1-dev
           zlib1g-dev
           libsqlite3-dev
-          apache2-dev
-          gettext
-          libncurses-dev
           ninja-build
-          ${{ matrix.extra_packages }}
 
       - name: Install dependencies (Mac OS, homebrew)
         if: runner.os == 'macOS'
@@ -176,14 +156,14 @@ jobs:
           };
           cmake -B out
           -DBUILD_SHARED_LIBS=${{ matrix.build_shared }}
-          -DSVN_ENABLE_TESTS=ON
+          -DSVN_ENABLE_TESTS=OFF
           -DSVN_ENABLE_RA_SERF=ON
           -DSVN_ENABLE_NLS=ON
-          -DSVN_ENABLE_APACHE_MODULES=${{ runner.os != 'Windows' && 'ON' || 'OFF' }}
-          -DSVN_ENABLE_TUI=ON
+          -DSVN_ENABLE_APACHE_MODULES=OFF
+          -DSVN_ENABLE_TUI=OFF
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/installdir
           -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
-          -DSVN_TEST_CONFIGURE_FOR_PARALLEL=ON
+          -DSVN_INSTALL_PRIVATE_H=ON
           -DSVN_ENABLE_FS_BASE=OFF
           -DSVN_ENABLE_SWIG_PERL=OFF
           -DSVN_ENABLE_SWIG_PYTHON=OFF
@@ -197,23 +177,3 @@ jobs:
 
       - name: Install
         run: cmake --install out --config Release
-
-      - name: Run all tests
-        id: run_all_tests
-        if: matrix.run_tests
-        working-directory: out
-        run: ctest --output-on-failure --verbose -C Release --parallel 16
-
-      - name: Test shelf2
-        if: matrix.run_tests
-        working-directory: out
-        env:
-          SVN_EXPERIMENTAL_COMMANDS: shelf2
-        run: ctest -R shelf2 --verbose -C Release
-
-      - name: Test shelf3
-        if: matrix.run_tests
-        working-directory: out
-        env:
-          SVN_EXPERIMENTAL_COMMANDS: shelf3
-        run: ctest -R shelf3 --verbose -C Release

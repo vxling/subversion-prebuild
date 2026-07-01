@@ -217,10 +217,19 @@ jobs:
             # Copy headers from standard include paths
             $sys_inc = "/usr/include"
             $dest_inc = "${{ github.workspace }}/installdir/include"
-            $hdrs = @("apr-1.0","expat.h","expat_external.h","expat_config.h",
-                      "openssl","serf-1","sqlite3.h","zlib.h","zconf.h")
-            foreach ($h in $hdrs) {
-              $s = "$sys_inc/$h"; if (Test-Path $s) { Copy-Item $s -Destination "$dest_inc/" -Recurse -Force }
+            # apr-1.0 contains both apr and apu headers (mirrors Windows APR layout)
+            Copy-Item "$sys_inc/apr-1.0" -Destination "$dest_inc/" -Recurse -Force
+            # sqlite3ext.h is not under serf-1, copy separately
+            Copy-Item "$sys_inc/sqlite3ext.h" -Destination "$dest_inc/" -Force
+            # openssl and serf-1 are full subtrees
+            Copy-Item "$sys_inc/openssl" -Destination "$dest_inc/" -Recurse -Force
+            Copy-Item "$sys_inc/serf-1" -Destination "$dest_inc/" -Recurse -Force
+            # Individual headers
+            @("expat.h","expat_external.h","expat_config.h",
+              "sqlite3.h","zlib.h","zconf.h","zip.h",
+              "curses.h","panel.h","iconv.h","libintl.h",
+              "libcharset.h","localcharset.h") | ForEach-Object {
+              $s = "$sys_inc/$_"; if (Test-Path $s) { Copy-Item $s -Destination "$dest_inc/" -Force }
             }
             tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           } else {

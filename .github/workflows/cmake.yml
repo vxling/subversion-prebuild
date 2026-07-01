@@ -191,12 +191,18 @@ jobs:
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/bin" | Out-Null
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/lib/pkgconfig" | Out-Null
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/include" | Out-Null
-            # Copy ALL .so libraries from system multiarch paths (mirrors Windows vcpkg layout)
+            # Copy .so libraries from system paths
             $dest_bin = "${{ github.workspace }}/installdir/bin"
-            $so_src_dirs = @("/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu")
+            $so_src_dirs = @("/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu")
+            $lib_names = @(
+              "libapr-1.so.0","libaprutil-1.so.0","libserf-1.so.1",
+              "libexpat.so.1","libssl.so.3","libcrypto.so.3",
+              "libz.so.1","libsqlite3.so.0"
+            )
             foreach ($dir in $so_src_dirs) {
-              Get-ChildItem -Path $dir -Filter "*.so*" -File | ForEach-Object {
-                Copy-Item $_.FullName -Destination $dest_bin -Force
+              foreach ($lib in $lib_names) {
+                $f = Join-Path $dir $lib
+                if (Test-Path $f) { Copy-Item $f -Destination $dest_bin -Force }
               }
             }
             # Copy pkg-config files from standard locations

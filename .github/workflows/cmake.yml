@@ -191,23 +191,13 @@ jobs:
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/bin" | Out-Null
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/lib/pkgconfig" | Out-Null
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/include" | Out-Null
-            # Copy system dependency .so libraries from standard multiarch paths
+            # Copy ALL .so libraries from system multiarch paths (mirrors Windows vcpkg layout)
             $dest_bin = "${{ github.workspace }}/installdir/bin"
-            $sys_libs = @(
-              "/lib/x86_64-linux-gnu/libapr-1.so.0",
-              "/lib/x86_64-linux-gnu/libaprutil-1.so.0",
-              "/lib/x86_64-linux-gnu/libserf-1.so.1",
-              "/lib/x86_64-linux-gnu/libexpat.so.1",
-              "/lib/x86_64-linux-gnu/libssl.so.3",
-              "/lib/x86_64-linux-gnu/libcrypto.so.3",
-              "/lib/x86_64-linux-gnu/libz.so.1",
-              "/lib/x86_64-linux-gnu/libsqlite3.so.0"
-            )
-            foreach ($lib in $sys_libs) {
-              if (Test-Path $lib) { Copy-Item $lib -Destination $dest_bin -Force }
-              # Also copy the multiarch path variants
-              $ma = "/usr/lib/x86_64-linux-gnu/$(Split-Path $lib -Leaf)"
-              if ((Test-Path $ma) -and ($ma -ne $lib)) { Copy-Item $ma -Destination $dest_bin -Force }
+            $so_src_dirs = @("/lib/x86_64-linux-gnu", "/usr/lib/x86_64-linux-gnu")
+            foreach ($dir in $so_src_dirs) {
+              Get-ChildItem -Path $dir -Filter "*.so*" -File | ForEach-Object {
+                Copy-Item $_.FullName -Destination $dest_bin -Force
+              }
             }
             # Copy pkg-config files from standard locations
             $sys_lib = "/usr/lib/x86_64-linux-gnu"

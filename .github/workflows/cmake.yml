@@ -187,8 +187,91 @@ jobs:
             # Use Compress-Archive to create a real .zip file
             Compress-Archive -Path "${{ github.workspace }}/installdir/*" -DestinationPath "${{ github.workspace }}/${{ matrix.artifact_name }}" -Force
           } elseif ($env:RUNNER_OS -eq 'Linux') {
+            # Ensure directories exist
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/bin" | Out-Null
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/lib/pkgconfig" | Out-Null
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/include" | Out-Null
+            # Copy system dependency .so libraries and headers to match Windows layout
+            $sys_lib  = "/usr/lib/x86_64-linux-gnu"
+            $sys_lib6 = "/usr/lib/x86_64-linux-gnu/$(gcc -print-multiarch)"
+            $sys_inc  = "/usr/include"
+            $dest_lib = "${{ github.workspace }}/installdir/lib"
+            $dest_inc = "${{ github.workspace }}/installdir/include"
+            $dest_bin = "${{ github.workspace }}/installdir/bin"
+            $libs = @{
+              "libapr-1.so.0"        = "$sys_lib6/libapr-1.so.0"
+              "libaprutil-1.so.0"    = "$sys_lib6/libaprutil-1.so.0"
+              "libserf-1.so.1"       = "$sys_lib6/libserf-1.so.1"
+              "libexpat.so.1"        = "$sys_lib6/libexpat.so.1"
+              "libssl.so.3"          = "$sys_lib6/libssl.so.3"
+              "libcrypto.so.3"       = "$sys_lib6/libcrypto.so.3"
+              "libz.so.1"            = "$sys_lib/libz.so.1"
+              "libsqlite3.so.0"      = "$sys_lib6/libsqlite3.so.0"
+            }
+            foreach ($name in $libs.Keys) {
+              $src = $libs[$name]
+              if (Test-Path $src) {
+                Copy-Item $src -Destination "$dest_bin/$name" -Force
+                # also copy the real sonamed file
+                $real = (Get-Item $src).Target
+                if ($real -and (Test-Path $real)) {
+                  Copy-Item $real -Destination "$dest_bin/$name" -Force
+                }
+              }
+            }
+            # Copy pkg-config files
+            $pc_src = @("$sys_lib/pkgconfig/apr-1.pc","$sys_lib/pkgconfig/apr-util-1.pc","$sys_lib/pkgconfig/serf-1.pc","$sys_lib/pkgconfig/expat.pc","$sys_lib/pkgconfig/openssl.pc","$sys_lib/pkgconfig/zlib.pc","$sys_lib/pkgconfig/sqlite3.pc")
+            foreach ($pc in $pc_src) {
+              if (Test-Path $pc) { Copy-Item $pc -Destination "$dest_lib/pkgconfig/" -Force }
+            }
+            # Copy headers
+            $hdrs = @("apr-1","apu.h","expat.h","expat_external.h","expat_config.h","openssl","serf-1","sqlite3.h","zlib.h","zconf.h")
+            foreach ($h in $hdrs) {
+              $s = "$sys_inc/$h"; if (Test-Path $s) { Copy-Item $s -Destination "$dest_inc/" -Recurse -Force }
+            }
             tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           } else {
+            # macOS: ensure directories exist
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/bin" | Out-Null
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/lib/pkgconfig" | Out-Null
+            New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/include" | Out-Null
+            # macOS: copy Homebrew libraries and headers
+            $brew = (brew --prefix)
+            $dest_lib = "${{ github.workspace }}/installdir/lib"
+            $dest_inc = "${{ github.workspace }}/installdir/include"
+            $dest_bin = "${{ github.workspace }}/installdir/bin"
+            $libs = @{
+              "libapr-1.dylib"       = "$brew/opt/apr/lib/libapr-1.dylib"
+              "libaprutil-1.dylib"   = "$brew/opt/apr-util/lib/libaprutil-1.dylib"
+              "libserf-1.dylib"      = "$brew/opt/serf/lib/libserf-1.dylib"
+              "libexpat.dylib"       = "$brew/opt/expat/lib/libexpat.dylib"
+              "libssl.dylib"         = "$brew/opt/openssl@3/lib/libssl.dylib"
+              "libcrypto.dylib"      = "$brew/opt/openssl@3/lib/libcrypto.dylib"
+              "libz.dylib"           = "$brew/opt/zlib/lib/libz.dylib"
+              "libsqlite3.dylib"     = "$brew/opt/sqlite/lib/libsqlite3.dylib"
+            }
+            foreach ($name in $libs.Keys) {
+              $src = $libs[$name]
+              if (Test-Path $src) { Copy-Item $src -Destination "$dest_bin/$name" -Force }
+            }
+            # Copy pkg-config files
+            $pc_src = @("$brew/opt/apr/lib/pkgconfig/apr-1.pc","$brew/opt/apr-util/lib/pkgconfig/apr-util-1.pc","$brew/opt/serf/lib/pkgconfig/serf-1.pc","$brew/opt/expat/lib/pkgconfig/expat.pc","$brew/opt/openssl@3/lib/pkgconfig/openssl.pc","$brew/opt/zlib/lib/pkgconfig/zlib.pc","$brew/opt/sqlite/lib/pkgconfig/sqlite3.pc")
+            foreach ($pc in $pc_src) {
+              if (Test-Path $pc) { Copy-Item $pc -Destination "$dest_lib/pkgconfig/" -Force }
+            }
+            # Copy headers
+            $hdrs = @("apr-1","apu.h","expat.h","expat_external.h","openssl","serf-1","sqlite3.h","zlib.h","zconf.h")
+            foreach ($h in $hdrs) {
+              $s = "$brew/include/$h"; if (Test-Path $s) { Copy-Item $s -Destination "$dest_inc/" -Recurse -Force }
+            }
+            # Fix install names: make dylibs reference @rpath relative to executable
+            foreach ($name in $libs.Keys) {
+              $src = "$dest_bin/$name"
+              if (Test-Path $src) {
+                # ensure the dylib itself has an id set
+                if ($name -ne (Split-Path $src -Leaf)) { }
+              }
+            }
             tar -czf ${{ matrix.artifact_name }} -C ${{ github.workspace }}/installdir .
           }
 

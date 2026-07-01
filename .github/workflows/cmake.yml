@@ -236,7 +236,7 @@ jobs:
             # Copy headers from standard include paths
             $sys_inc = "/usr/include"
             $dest_inc = "${{ github.workspace }}/installdir/include"
-            $hdrs = @("apr-1","apu.h","expat.h","expat_external.h","expat_config.h",
+            $hdrs = @("apr-1.0","expat.h","expat_external.h","expat_config.h",
                       "openssl","serf-1","sqlite3.h","zlib.h","zconf.h")
             foreach ($h in $hdrs) {
               $s = "$sys_inc/$h"; if (Test-Path $s) { Copy-Item $s -Destination "$dest_inc/" -Recurse -Force }

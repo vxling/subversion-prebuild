@@ -191,41 +191,53 @@ jobs:
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/bin" | Out-Null
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/lib/pkgconfig" | Out-Null
             New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/installdir/include" | Out-Null
-            # Copy system dependency .so libraries and headers to match Windows layout
-            $sys_lib  = "/usr/lib/x86_64-linux-gnu"
-            $sys_lib6 = "/usr/lib/x86_64-linux-gnu/$(gcc -print-multiarch)"
-            $sys_inc  = "/usr/include"
-            $dest_lib = "${{ github.workspace }}/installdir/lib"
-            $dest_inc = "${{ github.workspace }}/installdir/include"
-            $dest_bin = "${{ github.workspace }}/installdir/bin"
-            $libs = @{
-              "libapr-1.so.0"        = "$sys_lib6/libapr-1.so.0"
-              "libaprutil-1.so.0"    = "$sys_lib6/libaprutil-1.so.0"
-              "libserf-1.so.1"       = "$sys_lib6/libserf-1.so.1"
-              "libexpat.so.1"        = "$sys_lib6/libexpat.so.1"
-              "libssl.so.3"          = "$sys_lib6/libssl.so.3"
-              "libcrypto.so.3"       = "$sys_lib6/libcrypto.so.3"
-              "libz.so.1"            = "$sys_lib/libz.so.1"
-              "libsqlite3.so.0"      = "$sys_lib6/libsqlite3.so.0"
+            # Discover real library paths via ldconfig, then copy sonames + real files to bin/
+            $libs_to_copy = @{
+              "libapr-1.so.0"     = @()
+              "libaprutil-1.so.0" = @()
+              "libserf-1.so.1"    = @()
+              "libexpat.so.1"     = @()
+              "libssl.so.3"       = @()
+              "libcrypto.so.3"    = @()
+              "libz.so.1"         = @()
+              "libsqlite3.so.0"   = @()
             }
-            foreach ($name in $libs.Keys) {
-              $src = $libs[$name]
-              if (Test-Path $src) {
-                Copy-Item $src -Destination "$dest_bin/$name" -Force
-                # also copy the real sonamed file
-                $real = (Get-Item $src).Target
-                if ($real -and (Test-Path $real)) {
-                  Copy-Item $real -Destination "$dest_bin/$name" -Force
+            $ldconfig_out = ldconfig -p 2>&1 | Out-String
+            foreach ($line in $ldconfig_out -split "`n") {
+              if ($line -match '^\s*(\S+\.so[^\s]+)\s*.*=>\s*(/\S+)') {
+                $soname = $Matches[1].Trim()
+                $realpath = $Matches[2].Trim()
+                if ($libs_to_copy.ContainsKey($soname)) {
+                  $libs_to_copy[$soname] += $realpath
                 }
               }
             }
-            # Copy pkg-config files
-            $pc_src = @("$sys_lib/pkgconfig/apr-1.pc","$sys_lib/pkgconfig/apr-util-1.pc","$sys_lib/pkgconfig/serf-1.pc","$sys_lib/pkgconfig/expat.pc","$sys_lib/pkgconfig/openssl.pc","$sys_lib/pkgconfig/zlib.pc","$sys_lib/pkgconfig/sqlite3.pc")
-            foreach ($pc in $pc_src) {
-              if (Test-Path $pc) { Copy-Item $pc -Destination "$dest_lib/pkgconfig/" -Force }
+            $dest_bin = "${{ github.workspace }}/installdir/bin"
+            foreach ($soname in $libs_to_copy.Keys) {
+              foreach ($src in $libs_to_copy[$soname]) {
+                if (Test-Path $src) { Copy-Item $src -Destination $dest_bin -Force }
+              }
             }
-            # Copy headers
-            $hdrs = @("apr-1","apu.h","expat.h","expat_external.h","expat_config.h","openssl","serf-1","sqlite3.h","zlib.h","zconf.h")
+            # Copy pkg-config files from standard multiarch locations
+            $sys_lib = "/usr/lib/x86_64-linux-gnu"
+            $dest_pc = "${{ github.workspace }}/installdir/lib/pkgconfig"
+            $pc_files = @(
+              "$sys_lib/pkgconfig/apr-1.pc",
+              "$sys_lib/pkgconfig/apr-util-1.pc",
+              "$sys_lib/pkgconfig/serf-1.pc",
+              "$sys_lib/pkgconfig/expat.pc",
+              "/usr/lib/pkgconfig/openssl.pc",
+              "$sys_lib/pkgconfig/zlib.pc",
+              "$sys_lib/pkgconfig/sqlite3.pc"
+            )
+            foreach ($pc in $pc_files) {
+              if (Test-Path $pc) { Copy-Item $pc -Destination $dest_pc -Force }
+            }
+            # Copy headers from standard include paths
+            $sys_inc = "/usr/include"
+            $dest_inc = "${{ github.workspace }}/installdir/include"
+            $hdrs = @("apr-1","apu.h","expat.h","expat_external.h","expat_config.h",
+                      "openssl","serf-1","sqlite3.h","zlib.h","zconf.h")
             foreach ($h in $hdrs) {
               $s = "$sys_inc/$h"; if (Test-Path $s) { Copy-Item $s -Destination "$dest_inc/" -Recurse -Force }
             }
